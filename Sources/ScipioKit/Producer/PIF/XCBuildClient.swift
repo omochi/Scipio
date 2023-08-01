@@ -10,7 +10,6 @@ struct XCBuildClient {
     private let configuration: BuildConfiguration
     private let fileSystem: any FileSystem
     private let executor: any Executor
-    private let buildExecutor: any Executor
 
     init(
         package: DescriptionPackage,
@@ -18,8 +17,7 @@ struct XCBuildClient {
         buildOptions: BuildOptions,
         configuration: BuildConfiguration,
         fileSystem: any FileSystem = localFileSystem,
-        executor: any Executor = ProcessExecutor(decoder: StandardOutputDecoder()),
-        xcBuildExecutor: any Executor = ProcessExecutor(decoder: XCBuildOutputDecoder())
+        executor: any Executor = ProcessExecutor(decoder: StandardOutputDecoder())
     ) {
         self.descriptionPackage = package
         self.buildProduct = buildProduct
@@ -27,7 +25,6 @@ struct XCBuildClient {
         self.configuration = configuration
         self.fileSystem = fileSystem
         self.executor = executor
-        self.buildExecutor = xcBuildExecutor
     }
 
     private func fetchXCBuildPath() async throws -> AbsolutePath {
@@ -69,18 +66,14 @@ struct XCBuildClient {
         )
 
         let xcbuildPath = try await fetchXCBuildPath()
-        try await buildExecutor.execute(
-            xcbuildPath.pathString,
-            "build",
-            pifPath.pathString,
-            "--configuration",
-            configuration.settingsValue,
-            "--derivedDataPath",
-            descriptionPackage.derivedDataPath.pathString,
-            "--buildParametersFile",
-            buildParametersPath.pathString,
-            "--target",
-            buildProduct.target.name
+
+        let executor = XCBuildExecutor(xcbuildPath: xcbuildPath)
+        try await executor.build(
+            pifPath: pifPath,
+            configuration: configuration,
+            derivedDataPath: descriptionPackage.derivedDataPath,
+            buildParametersPath: buildParametersPath,
+            target: buildProduct.target
         )
 
         // Copy modulemap to built frameworks
